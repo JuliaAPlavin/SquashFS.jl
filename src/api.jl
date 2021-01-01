@@ -8,6 +8,8 @@ import TranscodingStreams: Codec, TranscodingStream
 end
 
 readdir(dir::Directory) = String[keys(dir.dirs)..., keys(dir.files)...]
+files_recursive(dir::Directory) = String[keys(dir.files)..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in files_recursive(d)]...]
+rglob(pattern, dir::Directory) = occursin(pattern, files_recursive(dir))
 
 
 @with_kw struct Image{TIO <: IO, TDECOMP <: Codec}
@@ -40,6 +42,9 @@ end
 
 
 readdir(img::Image, path::AbstractString) = readdir(directory_by_path(img, path))
+files_recursive(img::Image, path::AbstractString) = files_recursive(directory_by_path(img, path))
+rglob(img::Image, pattern, path::AbstractString="/") = rglob(pattern, directory_by_path(img, path))
+
 
 function readfile(img::Image, inode::InodeFile)
     bytes = UInt8[]
