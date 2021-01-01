@@ -1,0 +1,6 @@
+[deps]
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterMarkdown = "997ab1e6-3595-5248-9280-8efb232c3433"
+SquashFS = "22a32d6d-8ff7-41da-a9cb-095a6e0fb6ae"
+squashfs_tools_jll = "eed32e3e-a7c5-5bf9-9121-5cf3ab653887"

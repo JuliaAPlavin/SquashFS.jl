@@ -1,5 +1,11 @@
 import TranscodingStreams: Codec, TranscodingStream
 
+using DocStringExtensions
+@template DEFAULT = """
+$(TYPEDSIGNATURES)
+$(DOCSTRING)
+"""
+
 
 @with_kw struct Directory
     inode_number::Int
@@ -7,9 +13,9 @@ import TranscodingStreams: Codec, TranscodingStream
     dirs::Dict{String, Directory} = Dict()
 end
 
-readdir(dir::Directory) = String[keys(dir.dirs)..., keys(dir.files)...]
-files_recursive(dir::Directory) = String[keys(dir.files)..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in files_recursive(d)]...]
-rglob(pattern, dir::Directory) = String[[f for f in keys(dir.files) if occursin(pattern, f)]..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in rglob(pattern, d)]...]
+readdir(dir::Directory)::Vector{String} = String[keys(dir.dirs)..., keys(dir.files)...]
+files_recursive(dir::Directory)::Vector{String} = String[keys(dir.files)..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in files_recursive(d)]...]
+rglob(pattern, dir::Directory)::Vector{String} = String[[f for f in keys(dir.files) if occursin(pattern, f)]..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in rglob(pattern, d)]...]
 
 
 @with_kw struct Image{TIO <: IO, TDECOMP <: Codec}
@@ -27,8 +33,10 @@ end
 
 include("sqfs_parts.jl")
 
-
-function open(fname::AbstractString)
+"""Open SquashFS image file.
+Immediately reads list of all inodes, directory structure, and fragments table.
+These are always kept in memory for implementation simplicity and performance."""
+function open(fname::AbstractString)::Image
     io = Base.open(fname, "r")
     superblock = read_bittypes(io, Superblock)
     img = Image(; io, superblock, decompressor=decompressor(superblock))
@@ -40,9 +48,15 @@ function open(fname::AbstractString)
     return img
 end
 
-
+"""Return the names in the directory `path` within SquashFS image `img`."""
 readdir(img::Image, path::AbstractString) = readdir(directory_by_path(img, path))
+
+"""Return the paths of all files contained in the directory `path` within SquashFS image `img`, recursively.
+Returned paths are relative to the specified `path`."""
 files_recursive(img::Image, path::AbstractString) = files_recursive(directory_by_path(img, path))
+
+"""Returns the paths of all files matching `pattern` in directory `path` within SquashFS image `img`, recursively.
+`pattern` can be any object that supports `occursin(pattern, name::String)`: e.g. `String`, `Regex`, or patterns from the `Glob.jl` package."""
 rglob(img::Image, pattern, path::AbstractString="/") = rglob(pattern, directory_by_path(img, path))
 
 
@@ -62,9 +76,18 @@ function readfile(img::Image, inode::InodeFile)
     return bytes
 end
 
+"""Read content of the file at `path` in the SquashFS image `img`. Return a bytearray."""
 readfile(img::Image, path::AbstractString) = readfile(img, file_inode_by_path(img, path))
+
 readfile(img::Image, inode_number::Int) = readfile(img, img.inodes_files[inode_number])
+
+"""Read content of the file `spec` in the SquashFS image `img`. Returns a `String`.
+`spec` can be a path or another supported value such as an inode number."""
 readfile(img::Image, spec, ::Type{String}) = String(readfile(img, spec))
+
+"""Open the file at `path` in the SquashFS image `img` and return as an `IO` object.
+For now just reads the whole content of the file and wraps it into an `IOBuffer`.
+May become more efficient in the future."""
 openfile(img::Image, spec) = IOBuffer(readfile(img, spec))
 
 

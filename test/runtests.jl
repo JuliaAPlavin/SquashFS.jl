@@ -5,6 +5,10 @@ import squashfs_tools_jll: mksquashfs_path; const mksquashfs = mksquashfs_path
 import CompatHelperLocal
 @test CompatHelperLocal.@check()
 
+withenv("JULIA_LOAD_PATH" => nothing) do
+    run(`$(Base.julia_cmd()) ../docs/make.jl`)
+end
+
 
 @testset "empty" begin
     cd(mktempdir())
