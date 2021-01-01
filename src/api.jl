@@ -9,7 +9,7 @@ end
 
 readdir(dir::Directory) = String[keys(dir.dirs)..., keys(dir.files)...]
 files_recursive(dir::Directory) = String[keys(dir.files)..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in files_recursive(d)]...]
-rglob(pattern, dir::Directory) = occursin(pattern, files_recursive(dir))
+rglob(pattern, dir::Directory) = String[[f for f in keys(dir.files) if occursin(pattern, f)]..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in rglob(pattern, d)]...]
 
 
 @with_kw struct Image{TIO <: IO, TDECOMP <: Codec}

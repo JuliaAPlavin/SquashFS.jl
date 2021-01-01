@@ -114,6 +114,7 @@ end
     img = SquashFS.open("xdir.sqsh")
     @test Set(SquashFS.readdir(img, "/")) == Set(["emptyfile"; "tmpfile"; "longfile1"; "longfile2"; "longfile3"; "fsdsfаоывладылfkdsf"; "abc"; ["smallfile$i" for i in 1:1000]])
     @test Set(SquashFS.files_recursive(img, "/")) == Set(["emptyfile"; "tmpfile"; "longfile1"; "longfile2"; "longfile3"; "fsdsfаоывладылfkdsf"; "abc/def/првиет/file.txt"; ["smallfile$i" for i in 1:1000]])
+    @test Set(SquashFS.rglob(img, ".txt", "/")) == Set(["abc/def/првиет/file.txt"])
     @test SquashFS.readfile(img, "/emptyfile", String) == ""
     @test SquashFS.readfile(img, "/tmpfile", String) == "abc def\n\n\r"
     @test SquashFS.readfile(img, "/fsdsfаоывладылfkdsf", String) == "привет! abc def\n\n\r"
