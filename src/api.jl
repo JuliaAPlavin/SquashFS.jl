@@ -32,7 +32,7 @@ end
 
 function readdir(img::Image, inode_number::Int)
     dir_tab = img.directory_table[inode_number]
-    mapreduce(vcat, dir_tab) do (header, entries)
+    mapreduce(vcat, dir_tab, init=String[]) do (header, entries)
         map(e -> e.name, entries)
     end
 end
@@ -42,9 +42,18 @@ readdir(img::Image, path::AbstractString) = readdir(img, img.path_to_inode[path]
 function readfile(img::Image, inode_number::Int)
     header, inode = img.inodes[inode_number]
     @assert inode isa InodeFile
-    @assert block_count(inode, img.superblock) == 0
-    @assert is_valid(inode.fragment_block_index)
-    bytes = read_data_block(img, img.fragment_table[begin + inode.fragment_block_index], inode.block_offset+1:inode.block_offset + inode.file_size)
+    bytes = UInt8[]
+    start = inode.blocks_start
+    for bs in inode.block_sizes
+        block = size(bs) > 0 ? read_data_block(img, start, bs) : zeros(UInt8, min(img.superblock.block_size, inode.file_size - length(bytes)))
+        append!(bytes, block)
+        start += size(bs)
+    end
+    if is_valid(inode.fragment_block_index)
+        frag_blk = img.fragment_table[begin + inode.fragment_block_index]
+        append!(bytes, read_data_block(img, frag_blk, inode.block_offset+1:inode.block_offset + inode.file_size))
+    end
+    @assert length(bytes) == inode.file_size  (length(bytes), inode, inode.block_sizes)
     return String(bytes)
 end
 
@@ -52,13 +61,13 @@ readfile(img::Image, path::AbstractString) = readfile(img, img.path_to_inode[pat
 
 
 # = Helpers =
-function fill_path_to_inode!(img::Image, cur_path::String="/", cur_inode::Int=img.root_inode_number)
+function fill_path_to_inode!(img::Image, cur_path::String="/", cur_inode::Integer=img.root_inode_number)
     img.path_to_inode[cur_path] = cur_inode
     haskey(img.directory_table, cur_inode) || return
     dir_tab = img.directory_table[cur_inode]
     for (header, entries) in dir_tab
         for entry in entries
-            img.path_to_inode[joinpath(cur_path, entry.name)] = header.inode_number + entry.inode_offset
+            fill_path_to_inode!(img, joinpath(cur_path, entry.name), header.inode_number + entry.inode_offset)
         end
     end
 end

@@ -18,7 +18,7 @@ read_metadata_block(img::Image, ::Type{IO}) = IOBuffer(read_metadata_block(img, 
 function read_metadata_blocks(img::Image, rng::UnitRange{UInt64})
     seek(img.io, first(rng))
     buf = IOBuffer(read=true, append=true)
-    block_start_to_uncompressed_off = Dict{UInt64, UInt64}()
+    block_start_to_uncompressed_off = Dict{UInt64, UInt64}(0 => 0)
     while position(img.io) < last(rng)
         block_start_to_uncompressed_off[position(img.io) - first(rng)] = position(buf)
         write(buf, read_metadata_block(img, Vector{UInt8}))
@@ -28,8 +28,21 @@ function read_metadata_blocks(img::Image, rng::UnitRange{UInt64})
 end
 
 # = Data =
-function read_data_block(img::Image, start::UInt64, size::UInt32, is_compressed::Bool, rng::UnitRange)
-    @assert is_compressed
+read_data_block(img::Image, start::Unsigned, bs::BlockSize) = read_data_block(img, start, size(bs), is_compressed(bs))
+function read_data_block(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool)
+    if is_compressed
+        seek(img.io, start)
+        data = read_all(img.io, size)
+        transcode(img.decompressor, data)
+    else
+        seek(img.io, start)
+        read_all(img.io, size)
+    end
+end
+
+read_data_block(img::Image, fbe::FragmentBlockEntry, rng::UnitRange) = read_data_block(img, fbe.start, fbe.size, rng)
+read_data_block(img::Image, start::Unsigned, bs::BlockSize, rng::UnitRange) = read_data_block(img, start, size(bs), is_compressed(bs), rng)
+function read_data_block(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool, rng::UnitRange)
     if is_compressed
         seek(img.io, start)
         decomp_io = TranscodingStream{img.decompressor}(img.io)
@@ -40,8 +53,6 @@ function read_data_block(img::Image, start::UInt64, size::UInt32, is_compressed:
         read_all(img.io, length(rng))
     end
 end
-
-read_data_block(img::Image, fbe::FragmentBlockEntry, rng::UnitRange) = read_data_block(img, fbe.start, size(fbe), is_compressed(fbe), rng)
 
 
 
@@ -64,6 +75,7 @@ function read_inodes!(img::Image)
         inode = read(table_io, typ, img.superblock)
         push!(img.inodes, (header, inode))
     end
+    permute!(img.inodes, map(i -> i[1].inode_number, img.inodes))
     @assert map(i -> i[1].inode_number, img.inodes) == 1:img.superblock.inode_count
 end
 
@@ -71,7 +83,7 @@ function read_directory_table!(img::Image)
     @assert isempty(img.directory_table)
     table_io, block_start_to_uncompressed_off = read_metadata_blocks(img, img.superblock.directory_table_start:img.superblock.fragment_table_start - 1)
     
-    dir_inodes = filter(i -> i[2] isa InodeDirectoryExt, img.inodes)
+    dir_inodes = filter(i -> is_directory_inode(i[2]), img.inodes)
     map(dir_inodes) do (iheader, inode)
         img.directory_table[iheader.inode_number] = []
 

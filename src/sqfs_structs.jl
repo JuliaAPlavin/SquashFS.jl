@@ -3,6 +3,7 @@ using Setfield
 using FlagSets
 import CBinding: @cstruct
 import CodecZlib: ZlibDecompressor
+import CodecZstd: ZstdDecompressor
 
 
 const MAGIC = 0x73717368
@@ -29,6 +30,7 @@ end
 
 const compression_mode_to_decompressor = Dict(
     GZIP => ZlibDecompressor,
+    ZSTD => ZstdDecompressor,
 )
 
 @cstruct InodeReference {
@@ -80,31 +82,49 @@ decompressor(sb::Superblock) = compression_mode_to_decompressor[sb.compression_m
 end
 
 inode_type_resolve(typ::InodeType) =
-    if typ == FILE  InodeFile
+    if     typ ==         FILE          InodeFile
+    elseif typ ==    DIRECTORY     InodeDirectory
     elseif typ == DIRECTORYEXT  InodeDirectoryExt
     else throw(ArgumentError("unknown inode type: $typ")) end
 
 abstract type Inode end
+is_directory_inode(::Inode) = false
 
 
 # = Inode file ==
+@with_kw struct BlockSize
+    value::UInt32
+end
+is_compressed(bs::BlockSize) = bs.value & 0x1000000 == 0
+size(bs::BlockSize) = bs.value & 0xFFFFFF
+
 @with_kw struct InodeFile <: Inode
     blocks_start         ::UInt32    # The offset from the start of the archive where the data blocks are stored
     fragment_block_index ::UInt32    # The index of a fragment entry in the fragment table which describes the data block the fragment of this file is stored in. If this file does not end with a fragment, this should be 0xFFFFFFFF
     block_offset         ::UInt32    # The (uncompressed) offset within the fragment data block where the fragment for this file. Information about the fragment can be found at fragment_block_index. The size of the fragment can be found as file_size % superblock.block_size If this file does not end with a fragment, the value of this field is undefined (probably zero)
     file_size            ::Int32     # The (uncompressed) size of this file
-    block_sizes          ::Vector{Int32} = [] # A list of block sizes. If this file ends in a fragment, the size of this list is the number of full data blocks needed to store file_size bytes. If this file does not have a fragment, the size of the list is the number of blocks needed to store file_size bytes, rounded up. Each item in the list describes the (possibly compressed) size of a block. See datablocks & fragments for information about how to interpret this size.
+    block_sizes          ::Vector{BlockSize} = [] # A list of block sizes. If this file ends in a fragment, the size of this list is the number of full data blocks needed to store file_size bytes. If this file does not have a fragment, the size of the list is the number of blocks needed to store file_size bytes, rounded up. Each item in the list describes the (possibly compressed) size of a block. See datablocks & fragments for information about how to interpret this size.
 end
 block_count(i::InodeFile, sb::Superblock) = !is_valid(i.fragment_block_index) ? cld(i.file_size, sb.block_size) : fld(i.file_size, sb.block_size)
 tail_end_size(i::InodeFile, sb::Superblock) = i.file_size % sb.block_size
 
 function Base.read(io::IO, ::Type{InodeFile}, superblock::Superblock)
     res = read_bittypes(io, InodeFile)
-    append!(res.block_sizes, [read(io, UInt32) for _ in 1:block_count(res, superblock)])
+    append!(res.block_sizes, [read_bittypes(io, BlockSize) for _ in 1:block_count(res, superblock)])
     return res
 end
 
 # = Inode dir =
+@with_kw struct InodeDirectory <: Inode
+    block_idx            ::UInt32  # The index of the block in the Directory Table where the directory entry information starts
+    hard_link_count      ::UInt32  # The number of hard links to this directory
+    file_size            ::UInt16  # Total (uncompressed) size in bytes of the entries in the Directory Table, including headers
+    block_offset         ::UInt16  # The (uncompressed) offset within the block in the Directory Table where the directory entry information starts
+    parent_inode_number  ::UInt32  # The inode_number of the parent of this directory. If this is the root directory, this will be 1
+end
+is_directory_inode(::InodeDirectory) = true
+Base.read(io::IO, ::Type{InodeDirectory}, ::Superblock) = read_bittypes(io, InodeDirectory)
+
 @with_kw struct DirectoryIndex
     index     ::UInt32  # This stores a byte offset from the first directory header to the current header, as if the uncompressed directory metadata blocks were laid out in memory consecutively.
     start     ::UInt32  # Start offset of a directory table metadata block
@@ -128,6 +148,7 @@ end
     xattr_idx            ::UInt32  # An index into the xattr lookup table. Set to 0xFFFFFFFF if the inode has no extended attributes
     index                ::Vector{DirectoryIndex} = []  # A list of directory index entries for faster lookup in the directory table
 end
+is_directory_inode(::InodeDirectoryExt) = true
 
 function Base.read(io::IO, ::Type{InodeDirectoryExt}, superblock::Superblock)
     res = read_bittypes(io, InodeDirectoryExt)
@@ -164,9 +185,7 @@ end
 # == Fragment table == 
 @with_kw struct FragmentBlockEntry
     start    ::UInt64  # The offset within the archive where the fragment block starts
-    size     ::UInt32  # This stores two pieces of information. If the block is uncompressed, the 0x1000000 (1<<24) bit wil be set. The remaining bits describe the size of the fragment block on disk. Because the max value of block_size is 1 MiB (1<<20), and the size of a fragment block should be less than block_size, the uncompressed bit will never be set by the size.
+    size     ::BlockSize  # This stores two pieces of information. If the block is uncompressed, the 0x1000000 (1<<24) bit wil be set. The remaining bits describe the size of the fragment block on disk. Because the max value of block_size is 1 MiB (1<<20), and the size of a fragment block should be less than block_size, the uncompressed bit will never be set by the size.
     __unused ::UInt32  # This field is unused
     @assert __unused == 0
 end
-is_compressed(e::FragmentBlockEntry) = e.size & 0x1000000 == 0
-size(e::FragmentBlockEntry) = e.size & 0xFFFFFF
