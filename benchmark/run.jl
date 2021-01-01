@@ -16,19 +16,20 @@ let
     write("./xdir/longfile1", content1)
     content2 = rand(Float64, 1000*1000) |> string
     write("./xdir/longfile2", content2)
-    for i in 1:1000
+    n_files = 10_000
+    for i in 1:n_files
         write("./xdir/smallfile$i", join([string(i) for j in 1:10], "\n"))
     end
-    run(pipeline(`$mksquashfs xdir xdir.sqsh`, stdout=devnull))
+    @time run(pipeline(`$mksquashfs xdir xdir.sqsh`, stdout=devnull))
 
     img = SquashFS.open("xdir.sqsh")
     b = @benchmark SquashFS.open("xdir.sqsh")
-    @info "Open squashfs file" size_Mb=stat("xdir.sqsh").size b
+    @info "Open squashfs file" size_Mb=stat("xdir.sqsh").size/1e6 b
 
     b = @benchmark SquashFS.readfile($img, "/smallfile1")
     @info "Read same small file" IOPS=1/(time(b)/1e9) b
-    b = @benchmark SquashFS.readfile($img, "/smallfile$(rand(1:1000))")
-    @info "Read different small files" IOPS=1/(time(b)/1e9) b
+    b = @benchmark SquashFS.readfile($img, "/smallfile$(rand(1:$n_files))")
+    @info "Read different small files" IOPS=1/(time(median(b))/1e9) b
 
     for f in ["/smallfile1", "/longfile1", "/longfile2"]
         fsize = length(SquashFS.readfile(img, f))
@@ -36,3 +37,11 @@ let
         @info "Read file" size_Mb=fsize/1e6 speed_Mb_s=(fsize/1e6)/(time(b)/1e9) b
     end
 end
+
+# let
+#     large_file = "/home/aplavin/Downloads/antflag_0.sqsh"
+#     @time img = SquashFS.open(large_file);
+#     @btime SquashFS.readdir(img, "/J0541+5312")
+#     @btime SquashFS.directory_by_path(img, "/J0541+5312")
+#     @btime SquashFS.readfile(img, "/J0541+5312/J0541+5312_X_2011_07_24_pet_ell1-fgSC-2fit.mod")
+# end
