@@ -22,7 +22,7 @@ function open(fname::AbstractString)
     superblock = read_bittypes(io, Superblock)
     img = Image(; io, superblock, root_inode_number=-1, decompressor=decompressor(superblock))
 
-    @set! img.root_inode_number = read_root_inode_number(img, superblock)
+    @set! img.root_inode_number = read_root_inode_number(img)
     read_inodes!(img)
     read_directory_table!(img)
     read_fragment_table!(img)
@@ -64,7 +64,12 @@ openfile(img::Image, spec) = IOBuffer(readfile(img, spec))
 
 
 # = Helpers =
-function fill_path_to_inode!(img::Image, cur_path::String="/", cur_inode::Integer=img.root_inode_number)
+function fill_path_to_inode!(img::Image)
+    @assert isempty(img.path_to_inode)
+    fill_path_to_inode!(img, "/", img.root_inode_number)
+end
+
+function fill_path_to_inode!(img::Image, cur_path::String, cur_inode::Integer)
     img.path_to_inode[cur_path] = cur_inode
     haskey(img.directory_table, cur_inode) || return
     dir_tab = img.directory_table[cur_inode]

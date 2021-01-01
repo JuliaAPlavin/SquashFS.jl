@@ -57,10 +57,10 @@ end
 
 
 # == Whole tables =
-function read_root_inode_number(img::Image, superblock::Superblock)
-    seek(img.io, superblock.inode_table_start + superblock.root_inode_ref.block_start)
+function read_root_inode_number(img::Image)
+    seek(img.io, img.superblock.inode_table_start + img.superblock.root_inode_ref.block_start)
     block_io = read_metadata_block(img, IO)
-    skip_all(block_io, superblock.root_inode_ref.offset)
+    skip_all(block_io, img.superblock.root_inode_ref.offset)
     header = read_bittypes(block_io, InodeHeader)
     return header.inode_number
 end
@@ -84,7 +84,7 @@ function read_directory_table!(img::Image)
     table_io, block_start_to_uncompressed_off = read_metadata_blocks(img, img.superblock.directory_table_start:img.superblock.fragment_table_start - 1)
     
     dir_inodes = filter(i -> is_directory_inode(i[2]), img.inodes)
-    map(dir_inodes) do (iheader, inode)
+    for (iheader, inode) in dir_inodes
         img.directory_table[iheader.inode_number] = []
 
         uncompressed_start = block_start_to_uncompressed_off[inode.block_idx] + inode.block_offset
