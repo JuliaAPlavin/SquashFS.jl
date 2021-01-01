@@ -37,11 +37,3 @@ let
         @info "Read file" size_Mb=fsize/1e6 speed_Mb_s=(fsize/1e6)/(time(b)/1e9) b
     end
 end
-
-# let
-#     large_file = "/home/aplavin/Downloads/antflag_0.sqsh"
-#     @time img = SquashFS.open(large_file);
-#     @btime SquashFS.readdir(img, "/J0541+5312")
-#     @btime SquashFS.directory_by_path(img, "/J0541+5312")
-#     @btime SquashFS.readfile(img, "/J0541+5312/J0541+5312_X_2011_07_24_pet_ell1-fgSC-2fit.mod")
-# end
