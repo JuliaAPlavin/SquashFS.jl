@@ -49,7 +49,7 @@ end
     @test SquashFS.readfile(img, "/longfile4", String) == content4
 end
 
-@testset for args in [("-always-use-fragments",), ("-noDataCompression",), ("-always-use-fragments", "-noDataCompression", "-noInodeCompression", "-noFragmentCompression")]
+@testset for args in [("-always-use-fragments",), ("-Xcompression-level", "5",), ("-noDataCompression",), ("-noDataCompression", "-noInodeCompression", "-noFragmentCompression")]
     cd(mktempdir())
     mkdir("./xdir")
     content1 = String(ones(UInt8, 100_000))

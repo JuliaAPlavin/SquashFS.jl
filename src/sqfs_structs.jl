@@ -64,7 +64,6 @@ const compression_mode_to_decompressor = Dict(
     @assert magic == MAGIC
     @assert (version_major, version_minor) == (4, 0)
     @assert block_size == 2^block_log
-    @assert :COMPRESSOR_OPTIONS ∉ flags
 end
 
 function decompressor(sb::Superblock)
