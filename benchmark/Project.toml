@@ -1,0 +1,5 @@
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+PkgBenchmark = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"
+SquashFS = "22a32d6d-8ff7-41da-a9cb-095a6e0fb6ae"
+squashfs_tools_jll = "eed32e3e-a7c5-5bf9-9121-5cf3ab653887"
