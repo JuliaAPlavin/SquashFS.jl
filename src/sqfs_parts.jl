@@ -1,30 +1,29 @@
-import CodecZlib: ZlibDecompressor, ZlibDecompressorStream
-
+import TranscodingStreams: TranscodingStream
 
 # == Blocks ==
 
 # = Metadata =
-function read_metadata_block(io::IO, ::Type{Vector{UInt8}})
-    header = read(io, UInt16)
+function read_metadata_block(img::Image, ::Type{Vector{UInt8}})
+    header = read(img.io, UInt16)
     compressed = header & 0x8000 == 0
     size = header & ~0x8000
-    data = read(io, size)
+    data = read(img.io, size)
     if compressed
-        data = transcode(ZlibDecompressor, data)
+        data = transcode(img.decompressor, data)
     end
     return data
 end
-read_metadata_block(io::IO, ::Type{IO}) = IOBuffer(read_metadata_block(io, Vector{UInt8}))
+read_metadata_block(img::Image, ::Type{IO}) = IOBuffer(read_metadata_block(img, Vector{UInt8}))
 
-function read_metadata_blocks(io::IO, rng::UnitRange{UInt64})
-    seek(io, first(rng))
+function read_metadata_blocks(img::Image, rng::UnitRange{UInt64})
+    seek(img.io, first(rng))
     buf = IOBuffer(read=true, append=true)
     block_start_to_uncompressed_off = Dict{UInt64, UInt64}()
-    while position(io) < last(rng)
-        block_start_to_uncompressed_off[position(io) - first(rng)] = position(buf)
-        write(buf, read_metadata_block(io, Vector{UInt8}))
+    while position(img.io) < last(rng)
+        block_start_to_uncompressed_off[position(img.io) - first(rng)] = position(buf)
+        write(buf, read_metadata_block(img, Vector{UInt8}))
     end
-    @assert position(io) == last(rng) + 1
+    @assert position(img.io) == last(rng) + 1
     return buf, block_start_to_uncompressed_off
 end
 
@@ -33,7 +32,7 @@ function read_data_block(img::Image, start::UInt64, size::UInt32, is_compressed:
     @assert is_compressed
     if is_compressed
         seek(img.io, start)
-        decomp_io = ZlibDecompressorStream(img.io)
+        decomp_io = TranscodingStream{img.decompressor}(img.io)
         skip_all(decomp_io, first(rng) - 1)
         read_all(decomp_io, length(rng))
     else
@@ -47,9 +46,9 @@ read_data_block(img::Image, fbe::FragmentBlockEntry, rng::UnitRange) = read_data
 
 
 # == Whole tables =
-function read_root_inode_number(io::IO, superblock::Superblock)
-    seek(io, superblock.inode_table_start + superblock.root_inode_ref.block_start)
-    block_io = read_metadata_block(io, IO)
+function read_root_inode_number(img::Image, superblock::Superblock)
+    seek(img.io, superblock.inode_table_start + superblock.root_inode_ref.block_start)
+    block_io = read_metadata_block(img, IO)
     skip_all(block_io, superblock.root_inode_ref.offset)
     header = read_bittypes(block_io, InodeHeader)
     return header.inode_number
@@ -57,7 +56,7 @@ end
 
 function read_inodes!(img::Image)
     @assert isempty(img.inodes)
-    table_io, _ = read_metadata_blocks(img.io, img.superblock.inode_table_start:img.superblock.directory_table_start - 1)
+    table_io, _ = read_metadata_blocks(img, img.superblock.inode_table_start:img.superblock.directory_table_start - 1)
 
     while !eof(table_io)
         header = read_bittypes(table_io, InodeHeader)
@@ -70,7 +69,7 @@ end
 
 function read_directory_table!(img::Image)
     @assert isempty(img.directory_table)
-    table_io, block_start_to_uncompressed_off = read_metadata_blocks(img.io, img.superblock.directory_table_start:img.superblock.fragment_table_start - 1)
+    table_io, block_start_to_uncompressed_off = read_metadata_blocks(img, img.superblock.directory_table_start:img.superblock.fragment_table_start - 1)
     
     dir_inodes = filter(i -> i[2] isa InodeDirectoryExt, img.inodes)
     map(dir_inodes) do (iheader, inode)
@@ -96,7 +95,7 @@ function read_fragment_table!(img::Image)
     start_indices = [read(img.io, UInt64) for _ in 1:nblocks]
     for ix in start_indices
         seek(img.io, ix)
-        block = read_metadata_block(img.io, Vector{UInt8})
+        block = read_metadata_block(img, Vector{UInt8})
         append!(img.fragment_table, reinterpret(FragmentBlockEntry, block))
     end
     @assert length(img.fragment_table) == img.superblock.fragment_entry_count

@@ -2,6 +2,7 @@ using Parameters
 using Setfield
 using FlagSets
 import CBinding: @cstruct
+import CodecZlib: ZlibDecompressor
 
 
 const MAGIC = 0x73717368
@@ -25,6 +26,10 @@ is_valid(x::Integer) = count_zeros(x) > 0
 end
 
 @enum CompressionMode::UInt16 GZIP = 1 LZMA = 2 LZO  = 3 XZ   = 4 LZ4  = 5 ZSTD = 6
+
+const compression_mode_to_decompressor = Dict(
+    GZIP => ZlibDecompressor,
+)
 
 @cstruct InodeReference {
     offset::UInt16
@@ -58,6 +63,8 @@ end
     @assert block_size == 2^block_log
     @assert :COMPRESSOR_OPTIONS ∉ flags
 end
+
+decompressor(sb::Superblock) = compression_mode_to_decompressor[sb.compression_mode]
 
 
 # == Inodes ==

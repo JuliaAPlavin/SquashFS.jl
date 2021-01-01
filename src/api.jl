@@ -1,6 +1,9 @@
+import TranscodingStreams: Codec, Noop
 
-@with_kw struct Image{TIO <: IO}
+
+@with_kw struct Image{TIO <: IO, TDECOMP <: Codec}
     io::TIO
+    decompressor::Type{TDECOMP}
     superblock::Superblock
     root_inode_number::Int
     
@@ -17,8 +20,9 @@ include("sqfs_parts.jl")
 function open(fname::AbstractString)
     io = Base.open(fname, "r")
     superblock = read_bittypes(io, Superblock)
-    root_inode_number = read_root_inode_number(io, superblock)
-    img = Image(; io, superblock, root_inode_number)
+    img = Image(; io, superblock, root_inode_number=-1, decompressor=decompressor(superblock))
+
+    @set! img.root_inode_number = read_root_inode_number(img, superblock)
     read_inodes!(img)
     read_directory_table!(img)
     read_fragment_table!(img)
