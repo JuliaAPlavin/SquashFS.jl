@@ -23,9 +23,9 @@ end
     @test Set(SquashFS.readdir(img, "/")) == Set(["emptyfile", "tmpfile", "fsdsfаоывладылfkdsf"])
     @test_throws KeyError SquashFS.readdir(img, "/abc")
     @test_throws KeyError SquashFS.readfile(img, "/abc")
-    @test SquashFS.readfile(img, "/emptyfile") == ""
-    @test SquashFS.readfile(img, "/tmpfile") == "abc def\n\n\r"
-    @test SquashFS.readfile(img, "/fsdsfаоывладылfkdsf") == "привет! abc def\n\n\r"
+    @test SquashFS.readfile(img, "/emptyfile", String) == ""
+    @test SquashFS.readfile(img, "/tmpfile", String) == "abc def\n\n\r"
+    @test SquashFS.readfile(img, "/fsdsfаоывладылfkdsf", String) == "привет! abc def\n\n\r"
 end
 
 @testset "large files compression" begin
@@ -43,10 +43,10 @@ end
     @test stat("xdir.sqsh").size < 50*1000  # confirm compression
     img = SquashFS.open("xdir.sqsh")
     @test Set(SquashFS.readdir(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
-    @test SquashFS.readfile(img, "/longfile1") == content1
-    @test SquashFS.readfile(img, "/longfile2") == content2
-    @test SquashFS.readfile(img, "/longfile3") == content3
-    @test SquashFS.readfile(img, "/longfile4") == content4
+    @test SquashFS.readfile(img, "/longfile1", String) == content1
+    @test SquashFS.readfile(img, "/longfile2", String) == content2
+    @test SquashFS.readfile(img, "/longfile3", String) == content3
+    @test SquashFS.readfile(img, "/longfile4", String) == content4
 end
 
 @testset "different compression formats" for comp in ["gzip", "zstd"]
@@ -62,9 +62,9 @@ end
     @test stat("xdir.sqsh").size == 4096  # confirm compression
     img = SquashFS.open("xdir.sqsh")
     @test Set(SquashFS.readdir(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"])
-    @test SquashFS.readfile(img, "/longfile1") == content1
-    @test SquashFS.readfile(img, "/longfile2") == content2
-    @test SquashFS.readfile(img, "/longfile3") == content3
+    @test SquashFS.readfile(img, "/longfile1", String) == content1
+    @test SquashFS.readfile(img, "/longfile2", String) == content2
+    @test SquashFS.readfile(img, "/longfile3", String) == content3
 end
 
 @testset "mix" begin
@@ -87,17 +87,17 @@ end
     run(pipeline(`$mksquashfs xdir xdir.sqsh`, stdout=devnull))
     img = SquashFS.open("xdir.sqsh")
     @test Set(SquashFS.readdir(img, "/")) == Set(["emptyfile"; "tmpfile"; "longfile1"; "longfile2"; "longfile3"; "fsdsfаоывладылfkdsf"; "abc"; ["smallfile$i" for i in 1:1000]])
-    @test SquashFS.readfile(img, "/emptyfile") == ""
-    @test SquashFS.readfile(img, "/tmpfile") == "abc def\n\n\r"
-    @test SquashFS.readfile(img, "/fsdsfаоывладылfkdsf") == "привет! abc def\n\n\r"
-    @test SquashFS.readfile(img, "/longfile1") == content1
-    @test SquashFS.readfile(img, "/longfile2") == content2
-    @test SquashFS.readfile(img, "/longfile3") == content3
+    @test SquashFS.readfile(img, "/emptyfile", String) == ""
+    @test SquashFS.readfile(img, "/tmpfile", String) == "abc def\n\n\r"
+    @test SquashFS.readfile(img, "/fsdsfаоывладылfkdsf", String) == "привет! abc def\n\n\r"
+    @test SquashFS.readfile(img, "/longfile1", String) == content1
+    @test SquashFS.readfile(img, "/longfile2", String) == content2
+    @test SquashFS.readfile(img, "/longfile3", String) == content3
     for i in [1, 2, 3, 4, 5, 123, 500, 999, 1000]  # test several files among those 1000
-        @test SquashFS.readfile(img, "/smallfile$i") == join([string(j) for j in 1:i], "\n")
+        @test SquashFS.readfile(img, "/smallfile$i", String) == join([string(j) for j in 1:i], "\n")
     end
     @test SquashFS.readdir(img, "/abc") == ["def"]
-    @test SquashFS.readfile(img, "/abc/def/првиет/file.txt") == "\nabc\n"
+    @test SquashFS.readfile(img, "/abc/def/првиет/file.txt", String) == "\nabc\n"
 end
 
 # using BenchmarkTools

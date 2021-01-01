@@ -39,6 +39,7 @@ end
 
 readdir(img::Image, path::AbstractString) = readdir(img, img.path_to_inode[path])
 
+
 function readfile(img::Image, inode_number::Int)
     header, inode = img.inodes[inode_number]
     @assert inode isa InodeFile
@@ -54,10 +55,12 @@ function readfile(img::Image, inode_number::Int)
         append!(bytes, read_data_block(img, frag_blk, inode.block_offset+1:inode.block_offset + inode.file_size))
     end
     @assert length(bytes) == inode.file_size  (length(bytes), inode, inode.block_sizes)
-    return String(bytes)
+    return bytes
 end
 
 readfile(img::Image, path::AbstractString) = readfile(img, img.path_to_inode[path])
+readfile(img::Image, spec, ::Type{String}) = String(readfile(img, spec))
+openfile(img::Image, spec) = IOBuffer(readfile(img, spec))
 
 
 # = Helpers =
