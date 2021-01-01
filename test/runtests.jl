@@ -2,6 +2,10 @@ using Test
 import SquashFS
 import squashfs_tools_jll: mksquashfs_path; const mksquashfs = mksquashfs_path
 
+import CompatHelperLocal
+@test CompatHelperLocal.@check()
+
+
 @testset "empty" begin
     cd(mktempdir())
     mkdir("./xdir")

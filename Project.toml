@@ -11,3 +11,13 @@ FlagSets = "c7ad171a-416d-44a6-be7b-07ee749f090e"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 TranscodingStreams = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
+
+[compat]
+julia = "1.5,1.6"
+CBinding = "0.9" 
+CodecZlib = "0.7" 
+CodecZstd = "0.7" 
+FlagSets = "0.1" 
+Parameters = "0.12" 
+Setfield = "0.7" 
+TranscodingStreams = "0.9"
