@@ -20,7 +20,7 @@ function read_metadata_blocks(img::Image, rng::UnitRange{UInt64})
     buf = IOBuffer(read=true, append=true)
     block_start_to_uncompressed_off = Dict{UInt64, UInt64}(0 => 0)
     while position(img.io) < last(rng)
-        block_start_to_uncompressed_off[position(img.io) - first(rng)] = position(buf)
+        block_start_to_uncompressed_off[position(img.io) - first(rng)] = buf.size
         write(buf, read_metadata_block(img, Vector{UInt8}))
     end
     @assert position(img.io) == last(rng) + 1
