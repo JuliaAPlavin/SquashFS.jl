@@ -7,7 +7,7 @@ import TranscodingStreams: Codec, TranscodingStream
     dirs::Dict{String, Directory} = Dict()
 end
 
-readdir(dir::Directory) = [keys(dir.dirs)..., keys(dir.files)...]
+readdir(dir::Directory) = String[keys(dir.dirs)..., keys(dir.files)...]
 
 
 @with_kw struct Image{TIO <: IO, TDECOMP <: Codec}
