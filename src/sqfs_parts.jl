@@ -72,7 +72,8 @@ end
 
 
 
-# == Whole tables =
+# == Whole tables ==
+# = Inodes =
 function read_root_inode_number(img::Image)
     seek(img.io, img.superblock.inode_table_start + img.superblock.root_inode_ref.block_start)
     block_io = read_metadata_block(img, IO)
@@ -82,37 +83,67 @@ function read_root_inode_number(img::Image)
 end
 
 function read_inodes!(img::Image)
-    @assert isempty(img.inodes)
+    @assert isempty(img.inodes_files)
     table_io, _ = read_metadata_blocks(img, img.superblock.inode_table_start:img.superblock.directory_table_start - 1)
+    # todo: init inodes_files with correct size
 
     while !eof(table_io)
         header = read_bittypes(table_io, InodeHeader)
         typ = inode_type_resolve(header.inode_type)
-        inode = read(table_io, typ, img.superblock)
-        push!(img.inodes, (header, inode))
+        read_inode!(img, header, typ, table_io)
     end
-    permute!(img.inodes, map(i -> i[1].inode_number, img.inodes))
-    @assert map(i -> i[1].inode_number, img.inodes) == 1:img.superblock.inode_count
 end
 
-function read_directory_table!(img::Image)
-    @assert isempty(img.directory_table)
-    table_io, block_start_to_uncompressed_off = read_metadata_blocks(img, img.superblock.directory_table_start:img.superblock.fragment_table_start - 1)
-    
-    dir_inodes = filter(i -> is_directory_inode(i[2]), img.inodes)
-    for (iheader, inode) in dir_inodes
-        img.directory_table[iheader.inode_number] = []
+function read_inode!(img::Image, header::InodeHeader, typ::Type{InodeFile}, table_io::IO)
+    inode = read(table_io, typ, img.superblock)
+    if header.inode_number > length(img.inodes_files)
+        resize!(img.inodes_files, header.inode_number)
+    end
+    img.inodes_files[header.inode_number] = inode
+end
 
-        uncompressed_start = block_start_to_uncompressed_off[inode.block_idx] + inode.block_offset
-        seek(table_io, uncompressed_start)
-        while position(table_io) < uncompressed_start + inode.file_size - 3  # XXX: why -3???
-            header = read_bittypes(table_io, DirectoryHeader)
-            entries = [read(table_io, DirectoryEntry) for _  in 1:header.count + 1]
-            push!(img.directory_table[iheader.inode_number], header => entries)
+function read_inode!(img::Image, header::InodeHeader, typ::Type{<:Union{InodeDirectory, InodeDirectoryExt}}, table_io::IO)
+    @assert !haskey(img.inodes_dirs, header.inode_number)
+    inode = read(table_io, typ, img.superblock)
+    img.inodes_dirs[header.inode_number] = inode
+end
+
+
+# = Directory table =
+function read_directory_table!(img::Image)
+    # @assert isempty(img.directory_lists)
+    table_io, block_start_to_uncompressed_off = read_metadata_blocks(img, img.superblock.directory_table_start:img.superblock.fragment_table_start - 1)
+    seek_to_inode(inode::Inode) = seek(table_io, block_start_to_uncompressed_off[inode.block_idx] + inode.block_offset)
+    read_directory_table!(img, seek_to_inode, img.root_directory)
+end
+
+function read_directory_table!(img::Image, seek_to_inode::Function, dir::Directory)
+    @assert isempty(dir.files) && isempty(dir.dirs)
+
+    dir_inode = img.inodes_dirs[dir.inode_number]
+    table_io = seek_to_inode(dir_inode)
+    start_pos = position(table_io)
+
+    while position(table_io) < start_pos + dir_inode.file_size - 3  # XXX: why -3???
+        header = read_bittypes(table_io, DirectoryHeader)
+        for _ in 1:header.count + 1
+            entry = read(table_io, DirectoryEntry)
+            entry_inode_n = header.inode_number + entry.inode_offset
+            if entry.type == DIRECTORY
+                dir.dirs[entry.name] = Directory(inode_number=entry_inode_n)
+            elseif entry.type == FILE
+                dir.files[entry.name] = entry_inode_n
+            end
         end
     end
+
+    for subdir in values(dir.dirs)
+        read_directory_table!(img, seek_to_inode, subdir)
+    end
 end
 
+
+# = Fragment table =
 function read_fragment_table!(img::Image)
     @assert isempty(img.fragment_table)
     seek(img.io, img.superblock.fragment_table_start)

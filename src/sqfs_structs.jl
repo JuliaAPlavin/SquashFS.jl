@@ -176,6 +176,7 @@ end
     name_size    ::Int16   # One less than the size of the entry name
     name         ::String = ""  # The file name of the entry without a trailing null byte
     @assert name_size >= 0
+    @assert type ∈ (FILE, DIRECTORY)
 end
 
 function Base.read(io::IO, ::Type{DirectoryEntry})
