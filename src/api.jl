@@ -41,8 +41,7 @@ readdir(img::Image, path::AbstractString) = readdir(img, img.path_to_inode[path]
 
 
 function readfile(img::Image, inode_number::Int)
-    header, inode = img.inodes[inode_number]
-    @assert inode isa InodeFile
+    header, inode::InodeFile = img.inodes[inode_number]
     bytes = UInt8[]
     start = inode.blocks_start
     for bs in inode.block_sizes
