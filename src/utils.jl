@@ -1,7 +1,7 @@
 import CBinding: Cstruct
 
 
-@generated function read_bittypes(io::IO, ::Type{T}) where T
+@inline @generated function read_bittypes(io::IO, ::Type{T}) where T
     ftypes = fieldnames(T) .=> fieldtypes(T)
     pred = typ -> isbitstype(typ) || typ <: Cstruct
     bitfs = Iterators.takewhile(((k, typ),) -> pred(typ), ftypes)
@@ -10,7 +10,7 @@ import CBinding: Cstruct
     return :($T(;$(assignments...)))
 end
 
-function read_all(s::IO, nb::Integer)
+@inline function read_all(s::IO, nb::Integer)
     res = read(s, nb)
     length(res) < nb && throw(EOFError())
     return res

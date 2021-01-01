@@ -8,7 +8,7 @@ import CodecZstd: ZstdDecompressor
 
 
 const MAGIC = 0x73717368
-is_valid(x::Integer) = count_zeros(x) > 0
+@inline is_valid(x::Integer) = count_zeros(x) > 0
 
 
 # == Superblock ==
@@ -85,22 +85,22 @@ end
     inode_number  ::UInt32  # The position of this inode in the full list of inodes. Value should be in the range [1, inode_count](from the superblock) This can be treated as a unique identifier for this inode, and can be used as a key to recreate hard links: when processing the archive, remember the visited values of inode_number. If an inode number has already been visited, this inode is hardlinked
 end
 
-inode_type_resolve(typ::InodeType) =
+@inline inode_type_resolve(typ::InodeType) =
     if     typ ==         FILE          InodeFile
     elseif typ ==    DIRECTORY     InodeDirectory
     elseif typ == DIRECTORYEXT  InodeDirectoryExt
     else throw(ArgumentError("unknown inode type: $typ")) end
 
 abstract type Inode end
-is_directory_inode(::Inode) = false
+@inline is_directory_inode(::Inode) = false
 
 
 # = Inode file ==
 @with_kw struct BlockSize
     value::UInt32
 end
-is_compressed(bs::BlockSize) = bs.value & 0x1000000 == 0
-size(bs::BlockSize) = bs.value & 0xFFFFFF
+@inline is_compressed(bs::BlockSize) = bs.value & 0x1000000 == 0
+@inline size(bs::BlockSize) = bs.value & 0xFFFFFF
 
 @with_kw struct InodeFile <: Inode
     blocks_start         ::UInt32    # The offset from the start of the archive where the data blocks are stored
@@ -109,11 +109,14 @@ size(bs::BlockSize) = bs.value & 0xFFFFFF
     file_size            ::Int32     # The (uncompressed) size of this file
     block_sizes          ::Vector{BlockSize} = [] # A list of block sizes. If this file ends in a fragment, the size of this list is the number of full data blocks needed to store file_size bytes. If this file does not have a fragment, the size of the list is the number of blocks needed to store file_size bytes, rounded up. Each item in the list describes the (possibly compressed) size of a block. See datablocks & fragments for information about how to interpret this size.
 end
-block_count(i::InodeFile, sb::Superblock) = !is_valid(i.fragment_block_index) ? cld(i.file_size, sb.block_size) : fld(i.file_size, sb.block_size)
+@inline block_count(i::InodeFile, sb::Superblock) = !is_valid(i.fragment_block_index) ? cld(i.file_size, sb.block_size) : fld(i.file_size, sb.block_size)
 
-function Base.read(io::IO, ::Type{InodeFile}, superblock::Superblock)
+@inline function Base.read(io::IO, ::Type{InodeFile}, superblock::Superblock)
     res = read_bittypes(io, InodeFile)
-    append!(res.block_sizes, [read_bittypes(io, BlockSize) for _ in 1:block_count(res, superblock)])
+    resize!(res.block_sizes, block_count(res, superblock))
+    for i in 1:block_count(res, superblock)
+        res.block_sizes[i] = read_bittypes(io, BlockSize)
+    end
     return res
 end
 
@@ -125,8 +128,8 @@ end
     block_offset         ::UInt16  # The (uncompressed) offset within the block in the Directory Table where the directory entry information starts
     parent_inode_number  ::UInt32  # The inode_number of the parent of this directory. If this is the root directory, this will be 1
 end
-is_directory_inode(::InodeDirectory) = true
-Base.read(io::IO, ::Type{InodeDirectory}, ::Superblock) = read_bittypes(io, InodeDirectory)
+@inline is_directory_inode(::InodeDirectory) = true
+@inline Base.read(io::IO, ::Type{InodeDirectory}, ::Superblock) = read_bittypes(io, InodeDirectory)
 
 @with_kw struct DirectoryIndex
     index     ::UInt32  # This stores a byte offset from the first directory header to the current header, as if the uncompressed directory metadata blocks were laid out in memory consecutively.
@@ -135,7 +138,7 @@ Base.read(io::IO, ::Type{InodeDirectory}, ::Superblock) = read_bittypes(io, Inod
     name      ::String = ""  # The name of the first entry following the header without a trailing null byte
 end
 
-function Base.read(io::IO, ::Type{DirectoryIndex})
+@inline function Base.read(io::IO, ::Type{DirectoryIndex})
     res = read_bittypes(io, DirectoryIndex)
     @set! res.name = String(read_all(io, res.name_size + 1))
     return res
@@ -151,9 +154,9 @@ end
     xattr_idx            ::UInt32  # An index into the xattr lookup table. Set to 0xFFFFFFFF if the inode has no extended attributes
     index                ::Vector{DirectoryIndex} = []  # A list of directory index entries for faster lookup in the directory table
 end
-is_directory_inode(::InodeDirectoryExt) = true
+@inline is_directory_inode(::InodeDirectoryExt) = true
 
-function Base.read(io::IO, ::Type{InodeDirectoryExt}, superblock::Superblock)
+@inline function Base.read(io::IO, ::Type{InodeDirectoryExt}, superblock::Superblock)
     res = read_bittypes(io, InodeDirectoryExt)
     append!(res.index, [read(io, DirectoryIndex) for _ in 1:res.index_count])
     return res
@@ -179,7 +182,7 @@ end
     @assert type ∈ (FILE, DIRECTORY)
 end
 
-function Base.read(io::IO, ::Type{DirectoryEntry})
+@inline function Base.read(io::IO, ::Type{DirectoryEntry})
     res = read_bittypes(io, DirectoryEntry)
     @set! res.name = String(read_all(io, res.name_size + 1))
     return res
