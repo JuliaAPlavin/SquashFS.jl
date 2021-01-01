@@ -15,3 +15,4 @@ function read_all(s::IO, nb::Integer)
     length(res) < nb && throw(EOFError())
     return res
 end
+skip_all = read_all

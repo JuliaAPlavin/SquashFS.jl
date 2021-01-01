@@ -4,7 +4,6 @@ authors = ["Alexander Plavin <alexander@plav.in>"]
 version = "0.1.0"
 
 [deps]
-BangBang = "198e06fe-97b7-11e9-32a5-e1d131e6ad66"
 CBinding = "d43a6710-96b8-4a2d-833c-c424785e5374"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 FlagSets = "c7ad171a-416d-44a6-be7b-07ee749f090e"

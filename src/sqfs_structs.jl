@@ -54,7 +54,7 @@ end
     export_table_start     ::UInt64  # The byte offset at which the export table starts
 
     @assert magic == MAGIC
-    @assert version_major == 4 && version_minor == 0
+    @assert (version_major, version_minor) == (4, 0)
     @assert block_size == 2^block_log
     @assert :COMPRESSOR_OPTIONS ∉ flags
 end
@@ -91,6 +91,12 @@ end
 block_count(i::InodeFile, sb::Superblock) = !is_valid(i.fragment_block_index) ? cld(i.file_size, sb.block_size) : fld(i.file_size, sb.block_size)
 tail_end_size(i::InodeFile, sb::Superblock) = i.file_size % sb.block_size
 
+function Base.read(io::IO, ::Type{InodeFile}, superblock::Superblock)
+    res = read_bittypes(io, InodeFile)
+    append!(res.block_sizes, [read(io, UInt32) for _ in 1:block_count(res, superblock)])
+    return res
+end
+
 # = Inode dir =
 @with_kw struct DirectoryIndex
     index     ::UInt32  # This stores a byte offset from the first directory header to the current header, as if the uncompressed directory metadata blocks were laid out in memory consecutively.
@@ -114,12 +120,6 @@ end
     block_offset         ::UInt16  # The (uncompressed) offset within the block in the Directory Table where the directory entry information starts
     xattr_idx            ::UInt32  # An index into the xattr lookup table. Set to 0xFFFFFFFF if the inode has no extended attributes
     index                ::Vector{DirectoryIndex} = []  # A list of directory index entries for faster lookup in the directory table
-end
-
-function Base.read(io::IO, ::Type{InodeFile}, superblock::Superblock)
-    res = read_bittypes(io, InodeFile)
-    append!(res.block_sizes, [read(io, UInt32) for _ in 1:block_count(res, superblock)])
-    return res
 end
 
 function Base.read(io::IO, ::Type{InodeDirectoryExt}, superblock::Superblock)
