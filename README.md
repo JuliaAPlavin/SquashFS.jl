@@ -88,7 +88,7 @@ files_recursive(img::SquashFS.Image, path::AbstractString) -> Vector{String}
 Return the paths of all files contained in the directory `path` within SquashFS image `img`, recursively. Returned paths are relative to the specified `path`.
 
 
-<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/992c75318b500cfa96c839c70a881b76a093ed46/src/api.jl#L54' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/a626f5296698cfcbe851be31a50278c402f51d82/src/api.jl#L70' class='documenter-source'>source</a><br>
 
 <a id='SquashFS.open-Tuple{AbstractString}' href='#SquashFS.open-Tuple{AbstractString}'>#</a>
 **`SquashFS.open`** &mdash; *Method*.
@@ -96,14 +96,16 @@ Return the paths of all files contained in the directory `path` within SquashFS 
 
 
 ```julia
-open(fname::AbstractString) -> SquashFS.Image
+open(fname::AbstractString; threaded) -> SquashFS.Image
 
 ```
 
 Open SquashFS image file. Immediately reads list of all inodes, directory structure, and fragments table. These are always kept in memory for implementation simplicity and performance.
 
+`threaded` must be set to `true` to use the same image from multiple threads.
 
-<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/992c75318b500cfa96c839c70a881b76a093ed46/src/api.jl#L36' class='documenter-source'>source</a><br>
+
+<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/a626f5296698cfcbe851be31a50278c402f51d82/src/api.jl#L40' class='documenter-source'>source</a><br>
 
 <a id='SquashFS.openfile-Tuple{SquashFS.Image, Any}' href='#SquashFS.openfile-Tuple{SquashFS.Image, Any}'>#</a>
 **`SquashFS.openfile`** &mdash; *Method*.
@@ -118,7 +120,7 @@ openfile(img::SquashFS.Image, spec::Any) -> IOBuffer
 Open the file at `path` in the SquashFS image `img` and return as an `IO` object. For now just reads the whole content of the file and wraps it into an `IOBuffer`. May become more efficient in the future.
 
 
-<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/992c75318b500cfa96c839c70a881b76a093ed46/src/api.jl#L88' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/a626f5296698cfcbe851be31a50278c402f51d82/src/api.jl#L104' class='documenter-source'>source</a><br>
 
 <a id='SquashFS.readdir-Tuple{SquashFS.Image, AbstractString}' href='#SquashFS.readdir-Tuple{SquashFS.Image, AbstractString}'>#</a>
 **`SquashFS.readdir`** &mdash; *Method*.
@@ -126,14 +128,14 @@ Open the file at `path` in the SquashFS image `img` and return as an `IO` object
 
 
 ```julia
-readdir(img::SquashFS.Image, path::AbstractString) -> Vector{String}
+readdir(img::SquashFS.Image, path::AbstractString; join) -> Vector{String}
 
 ```
 
-Return the names in the directory `path` within SquashFS image `img`.
+Return the names in the directory `path` within SquashFS image `img`. When `join` is `false`, returns just the names in the directory as is; when `join` is `true`, returns `joinpath(path, name)` for each `name` so that the returned strings are full paths
 
 
-<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/992c75318b500cfa96c839c70a881b76a093ed46/src/api.jl#L51' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/a626f5296698cfcbe851be31a50278c402f51d82/src/api.jl#L59' class='documenter-source'>source</a><br>
 
 <a id='SquashFS.readfile-Tuple{SquashFS.Image, AbstractString}' href='#SquashFS.readfile-Tuple{SquashFS.Image, AbstractString}'>#</a>
 **`SquashFS.readfile`** &mdash; *Method*.
@@ -148,7 +150,7 @@ readfile(img::SquashFS.Image, path::AbstractString) -> Vector{UInt8}
 Read content of the file at `path` in the SquashFS image `img`. Return a bytearray.
 
 
-<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/992c75318b500cfa96c839c70a881b76a093ed46/src/api.jl#L79' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/a626f5296698cfcbe851be31a50278c402f51d82/src/api.jl#L95' class='documenter-source'>source</a><br>
 
 <a id='SquashFS.readfile-Tuple{SquashFS.Image, Any, Type{String}}' href='#SquashFS.readfile-Tuple{SquashFS.Image, Any, Type{String}}'>#</a>
 **`SquashFS.readfile`** &mdash; *Method*.
@@ -163,7 +165,7 @@ readfile(img::SquashFS.Image, spec::Any, _::Type{String}) -> String
 Read content of the file `spec` in the SquashFS image `img`. Returns a `String`. `spec` can be a path or another supported value such as an inode number.
 
 
-<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/992c75318b500cfa96c839c70a881b76a093ed46/src/api.jl#L84' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/a626f5296698cfcbe851be31a50278c402f51d82/src/api.jl#L100' class='documenter-source'>source</a><br>
 
 <a id='SquashFS.rglob' href='#SquashFS.rglob'>#</a>
 **`SquashFS.rglob`** &mdash; *Function*.
@@ -179,5 +181,5 @@ rglob(img::SquashFS.Image, pattern::Any, path::AbstractString) -> Vector{String}
 Returns the paths of all files matching `pattern` in directory `path` within SquashFS image `img`, recursively. `pattern` can be any object that supports `occursin(pattern, name::String)`: e.g. `String`, `Regex`, or patterns from the `Glob.jl` package.
 
 
-<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/992c75318b500cfa96c839c70a881b76a093ed46/src/api.jl#L58' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/aplavin/SquashFS.jl/blob/a626f5296698cfcbe851be31a50278c402f51d82/src/api.jl#L74' class='documenter-source'>source</a><br>
 

@@ -136,6 +136,34 @@ end
     @test SquashFS.readfile(img, "/abc/def/првиет/file.txt", String) == "\nabc\n"
 end
 
+@testset "multithreading" begin
+    @test Threads.nthreads() > 1
+
+    cd(mktempdir())
+    mkdir("./xdir")
+    mkdir("./xdir/smallfiles")
+    for i in 1:1000
+        write("./xdir/smallfiles/$i", join([string(j) for j in 1:i], "\n"))
+    end
+    mkdir("./xdir/largefiles")
+    for i in 1:10
+        write("./xdir/largefiles/$i", join([string(i) for j in 1:1_000_000], "\n"))
+    end
+    run(pipeline(`$mksquashfs xdir xdir.sqsh`, stdout=devnull))
+
+    img = SquashFS.open("xdir.sqsh"; threaded=true)
+    Threads.@threads for f in SquashFS.readdir(img, "/smallfiles", join=true)
+        i = parse(Int, basename(f))
+        # test is not counted in the printed number of tests
+        @test SquashFS.readfile(img, f, String) == join([string(j) for j in 1:i], "\n")
+    end
+    Threads.@threads for f in SquashFS.readdir(img, "/largefiles", join=true)
+        i = parse(Int, basename(f))
+        # test is not counted in the printed number of tests
+        @test SquashFS.readfile(img, f, String) == join([string(i) for j in 1:1_000_000], "\n")
+    end
+end
+
 # import SquashFS
 # const large_file = "/home/aplavin/Downloads/noflag.sqsh"
 # img = SquashFS.open(large_file)

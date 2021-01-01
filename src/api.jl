@@ -18,10 +18,10 @@ files_recursive(dir::Directory)::Vector{String} = String[keys(dir.files)..., [jo
 rglob(pattern, dir::Directory)::Vector{String} = String[[f for f in keys(dir.files) if occursin(pattern, f)]..., [joinpath(name, f) for (name, d) in pairs(dir.dirs) for f in rglob(pattern, d)]...]
 
 
-@with_kw struct Image{TIO <: IO, TDECOMP <: Codec}
-    io::TIO
-    decompressor::TDECOMP
-    decompressor_stream::TranscodingStream{TDECOMP, TIO} = TranscodingStream{typeof(decompressor)}(io)
+@with_kw struct Image{N, TIO <: IO, TDECOMP <: Codec}
+    io::NTuple{N, TIO}
+    decompressor::NTuple{N, TDECOMP}
+    decompressor_stream::NTuple{N, TranscodingStream{TDECOMP, TIO}} = Tuple(TranscodingStream{eltype(decompressor)}(io) for io in io)
 
     superblock::Superblock
     
@@ -31,15 +31,23 @@ rglob(pattern, dir::Directory)::Vector{String} = String[[f for f in keys(dir.fil
     fragment_table::Vector{FragmentBlockEntry} = []  # array index equals entry number
 end
 
+_io(img::Image) = img.io[Threads.threadid()]
+_decompressor(img::Image) = img.decompressor[Threads.threadid()]
+_decompressor_stream(img::Image) = img.decompressor_stream[Threads.threadid()]
+
 include("sqfs_parts.jl")
 
 """Open SquashFS image file.
 Immediately reads list of all inodes, directory structure, and fragments table.
-These are always kept in memory for implementation simplicity and performance."""
-function open(fname::AbstractString)::Image
-    io = Base.open(fname, "r")
-    superblock = read_bittypes(io, Superblock)
-    img = Image(; io, superblock, decompressor=decompressor(superblock))
+These are always kept in memory for implementation simplicity and performance.
+    
+`threaded` must be set to `true` to use the same image from multiple threads."""
+function open(fname::AbstractString; threaded=false)::Image
+    N = threaded ? Threads.nthreads() : 1
+    io = Tuple(Base.open(fname, "r") for _ in 1:N)
+    superblock = read_bittypes(io[1], Superblock)
+    decompressor = Tuple(create_decompressor(superblock) for _ in 1:N)
+    img = Image(; io, superblock, decompressor)
 
     @set! img.root_directory.inode_number = read_root_inode_number(img)
     read_inodes!(img)
@@ -48,8 +56,16 @@ function open(fname::AbstractString)::Image
     return img
 end
 
-"""Return the names in the directory `path` within SquashFS image `img`."""
-readdir(img::Image, path::AbstractString) = readdir(directory_by_path(img, path))
+"""Return the names in the directory `path` within SquashFS image `img`. When `join` is `false`, returns just the names in the directory as is; when `join` is
+`true`, returns `joinpath(path, name)` for each `name` so that the returned strings are full paths"""
+function readdir(img::Image, path::AbstractString; join::Bool=false)::Vector{String}
+    names = readdir(directory_by_path(img, path))
+    return if join
+        joinpath.(path, names)
+    else
+        names
+    end
+end
 
 """Return the paths of all files contained in the directory `path` within SquashFS image `img`, recursively.
 Returned paths are relative to the specified `path`."""

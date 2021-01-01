@@ -2,6 +2,9 @@ name: CI
 
 on: push
 
+env:
+  JULIA_NUM_THREADS: 4
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}

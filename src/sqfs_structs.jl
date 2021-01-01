@@ -66,7 +66,7 @@ const compression_mode_to_decompressor = Dict(
     @assert block_size == 2^block_log
 end
 
-function decompressor(sb::Superblock)
+function create_decompressor(sb::Superblock)
     decomp = compression_mode_to_decompressor[sb.compression_mode]()
     initialize(decomp)
     return decomp

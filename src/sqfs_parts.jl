@@ -4,26 +4,26 @@ import TranscodingStreams: TranscodingStream, State, initbuffer!
 
 # = Metadata =
 function read_metadata_block(img::Image, ::Type{Vector{UInt8}})
-    header = read(img.io, UInt16)
+    header = read(_io(img), UInt16)
     compressed = header & 0x8000 == 0
     size = header & ~0x8000
-    data = read(img.io, size)
+    data = read(_io(img), size)
     if compressed
-        data = transcode(img.decompressor, data)
+        data = transcode(_decompressor(img), data)
     end
     return data
 end
 read_metadata_block(img::Image, ::Type{IO}) = IOBuffer(read_metadata_block(img, Vector{UInt8}))
 
 function read_metadata_blocks(img::Image, rng::UnitRange{UInt64})
-    seek(img.io, first(rng))
+    seek(_io(img), first(rng))
     buf = IOBuffer(read=true, append=true)
     block_start_to_uncompressed_off = Dict{UInt64, UInt64}(0 => 0)
-    while position(img.io) < last(rng)
-        block_start_to_uncompressed_off[position(img.io) - first(rng)] = buf.size
+    while position(_io(img)) < last(rng)
+        block_start_to_uncompressed_off[position(_io(img)) - first(rng)] = buf.size
         write(buf, read_metadata_block(img, Vector{UInt8}))
     end
-    @assert position(img.io) == last(rng) + 1
+    @assert position(_io(img)) == last(rng) + 1
     return buf, block_start_to_uncompressed_off
 end
 
@@ -32,12 +32,12 @@ end
 read_data_block(img::Image, start::Unsigned, bs::BlockSize) = read_data_block(img, start, size(bs), is_compressed(bs))
 function read_data_block(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool)
     if is_compressed
-        seek(img.io, start)
-        data = read_all(img.io, size)
-        transcode(img.decompressor, data)
+        seek(_io(img), start)
+        data = read_all(_io(img), size)
+        transcode(_decompressor(img), data)
     else
-        seek(img.io, start)
-        read_all(img.io, size)
+        seek(_io(img), start)
+        read_all(_io(img), size)
     end
 end
 
@@ -47,26 +47,26 @@ read_data_block_part(img::Image, fbe::FragmentBlockEntry, rng::UnitRange) = read
 read_data_block_part(img::Image, start::Unsigned, bs::BlockSize, rng::UnitRange) = read_data_block_part(img, start, size(bs), is_compressed(bs), rng)
 function read_data_block_part(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool, rng::UnitRange)
     if is_compressed
-        seek(img.io, start)
+        seek(_io(img), start)
 
         ds = let
             # reinit buffers: fast, just shuffles pointers around
-            initbuffer!(img.decompressor_stream.state.buffer1)
-            initbuffer!(img.decompressor_stream.state.buffer2)
+            initbuffer!(_decompressor_stream(img).state.buffer1)
+            initbuffer!(_decompressor_stream(img).state.buffer2)
             # create "fresh" state: otherwise decompressor errors sometimes
-            state = State(img.decompressor_stream.state.buffer1, img.decompressor_stream.state.buffer2)
+            state = State(_decompressor_stream(img).state.buffer1, _decompressor_stream(img).state.buffer2)
             # create transcoding stream from existing buffers and initialized codec, fast
-            TranscodingStream(img.decompressor, img.io, state, initialized=true)
+            TranscodingStream(_decompressor(img), _io(img), state, initialized=true)
         end
         # simpler version of the above block, but creates buffers and initializes codec every time
         # leaks memory!
-        # ds = TranscodingStream(img.decompressor, img.io)
+        # ds = TranscodingStream(_decompressor(img), _io(img))
 
         skip_all(ds, first(rng) - 1)
         read_all(ds, length(rng))
     else
-        seek(img.io, start + first(rng) - 1)
-        read_all(img.io, length(rng))
+        seek(_io(img), start + first(rng) - 1)
+        read_all(_io(img), length(rng))
     end
 end
 
@@ -75,7 +75,7 @@ end
 # == Whole tables ==
 # = Inodes =
 function read_root_inode_number(img::Image)
-    seek(img.io, img.superblock.inode_table_start + img.superblock.root_inode_ref.block_start)
+    seek(_io(img), img.superblock.inode_table_start + img.superblock.root_inode_ref.block_start)
     block_io = read_metadata_block(img, IO)
     skip_all(block_io, img.superblock.root_inode_ref.offset)
     header = read_bittypes(block_io, InodeHeader)
@@ -143,14 +143,14 @@ end
 # = Fragment table =
 function read_fragment_table!(img::Image)
     @assert isempty(img.fragment_table)
-    seek(img.io, img.superblock.fragment_table_start)
+    seek(_io(img), img.superblock.fragment_table_start)
     
     nbytes = sizeof(FragmentBlockEntry) * img.superblock.fragment_entry_count
     nblocks = cld(nbytes, 8192)
 
-    start_indices = [read(img.io, UInt64) for _ in 1:nblocks]
+    start_indices = [read(_io(img), UInt64) for _ in 1:nblocks]
     for ix in start_indices
-        seek(img.io, ix)
+        seek(_io(img), ix)
         block = read_metadata_block(img, Vector{UInt8})
         append!(img.fragment_table, reinterpret(FragmentBlockEntry, block))
     end
