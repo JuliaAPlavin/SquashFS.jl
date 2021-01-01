@@ -1,6 +1,7 @@
 ======================================
 Taken from https://github.com/AgentD/squashfs-tools-ng/blob/master/doc/format.txt
 See also https://dr-emann.github.io/squashfs/
+Python implementation https://github.com/matteomattei/PySquashfsImage
 ======================================
 
                             Squashfs Binary Format
