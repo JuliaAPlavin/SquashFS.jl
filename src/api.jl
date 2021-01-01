@@ -32,9 +32,9 @@ end
 
 function readdir(img::Image, inode_number::Int)
     dir_tab = img.directory_table[inode_number]
-    mapreduce(vcat, dir_tab, init=String[]) do (header, entries)
-        map(e -> e.name, entries)
-    end
+    return [entry.name
+            for (header, entries) in dir_tab
+            for entry in entries]
 end
 
 readdir(img::Image, path::AbstractString) = readdir(img, img.path_to_inode[path])
