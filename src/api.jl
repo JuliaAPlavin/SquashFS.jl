@@ -1,9 +1,11 @@
-import TranscodingStreams: Codec, Noop
+import TranscodingStreams: Codec, TranscodingStream
 
 
 @with_kw struct Image{TIO <: IO, TDECOMP <: Codec}
     io::TIO
-    decompressor::Type{TDECOMP}
+    decompressor::TDECOMP
+    decompressor_stream::TranscodingStream{TDECOMP, TIO} = TranscodingStream{typeof(decompressor)}(io)
+
     superblock::Superblock
     root_inode_number::Int
     

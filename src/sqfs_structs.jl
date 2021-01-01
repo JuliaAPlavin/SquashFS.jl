@@ -2,6 +2,7 @@ using Parameters
 using Setfield
 using FlagSets
 import CBinding: @cstruct
+import TranscodingStreams: initialize
 import CodecZlib: ZlibDecompressor
 import CodecZstd: ZstdDecompressor
 
@@ -66,7 +67,11 @@ const compression_mode_to_decompressor = Dict(
     @assert :COMPRESSOR_OPTIONS ∉ flags
 end
 
-decompressor(sb::Superblock) = compression_mode_to_decompressor[sb.compression_mode]
+function decompressor(sb::Superblock)
+    decomp = compression_mode_to_decompressor[sb.compression_mode]()
+    initialize(decomp)
+    return decomp
+end
 
 
 # == Inodes ==

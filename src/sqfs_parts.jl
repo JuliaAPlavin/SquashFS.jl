@@ -1,4 +1,4 @@
-import TranscodingStreams: TranscodingStream
+import TranscodingStreams: TranscodingStream, State, initbuffer!
 
 # == Blocks ==
 
@@ -45,9 +45,22 @@ read_data_block(img::Image, start::Unsigned, bs::BlockSize, rng::UnitRange) = re
 function read_data_block(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool, rng::UnitRange)
     if is_compressed
         seek(img.io, start)
-        decomp_io = TranscodingStream{img.decompressor}(img.io)
-        skip_all(decomp_io, first(rng) - 1)
-        read_all(decomp_io, length(rng))
+
+        ds = let
+            # reinit buffers: fast, just shuffles pointers around
+            initbuffer!(img.decompressor_stream.state.buffer1)
+            initbuffer!(img.decompressor_stream.state.buffer2)
+            # create "fresh" state: otherwise decompressor errors sometimes
+            state = State(img.decompressor_stream.state.buffer1, img.decompressor_stream.state.buffer2)
+            # create transcoding stream from existing buffers and initialized codec, fast
+            TranscodingStream(img.decompressor, img.io, state, initialized=true)
+        end
+        # simpler version of the above block, but creates buffers and initializes codec every time
+        # leaks memory!
+        # ds = TranscodingStream(img.decompressor, img.io)
+
+        skip_all(ds, first(rng) - 1)
+        read_all(ds, length(rng))
     else
         seek(img.io, start + first(rng) - 1)
         read_all(img.io, length(rng))
