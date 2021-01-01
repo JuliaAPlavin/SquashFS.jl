@@ -28,6 +28,7 @@ function read_metadata_blocks(img::Image, rng::UnitRange{UInt64})
 end
 
 # = Data =
+# - Full block -
 read_data_block(img::Image, start::Unsigned, bs::BlockSize) = read_data_block(img, start, size(bs), is_compressed(bs))
 function read_data_block(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool)
     if is_compressed
@@ -40,9 +41,11 @@ function read_data_block(img::Image, start::Unsigned, size::Unsigned, is_compres
     end
 end
 
-read_data_block(img::Image, fbe::FragmentBlockEntry, rng::UnitRange) = read_data_block(img, fbe.start, fbe.size, rng)
-read_data_block(img::Image, start::Unsigned, bs::BlockSize, rng::UnitRange) = read_data_block(img, start, size(bs), is_compressed(bs), rng)
-function read_data_block(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool, rng::UnitRange)
+# - Part of block -
+read_data_block_part(img::Image, fbe::FragmentBlockEntry, inode::InodeFile) = read_data_block_part(img, fbe, inode.block_offset+1:inode.block_offset + inode.file_size % img.superblock.block_size)
+read_data_block_part(img::Image, fbe::FragmentBlockEntry, rng::UnitRange) = read_data_block_part(img, fbe.start, fbe.size, rng)
+read_data_block_part(img::Image, start::Unsigned, bs::BlockSize, rng::UnitRange) = read_data_block_part(img, start, size(bs), is_compressed(bs), rng)
+function read_data_block_part(img::Image, start::Unsigned, size::Unsigned, is_compressed::Bool, rng::UnitRange)
     if is_compressed
         seek(img.io, start)
 

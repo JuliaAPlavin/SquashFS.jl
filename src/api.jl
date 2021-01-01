@@ -53,7 +53,7 @@ function readfile(img::Image, inode_number::Int)
     end
     if is_valid(inode.fragment_block_index)
         frag_blk = img.fragment_table[begin + inode.fragment_block_index]
-        append!(bytes, read_data_block(img, frag_blk, inode.block_offset+1:inode.block_offset + inode.file_size))
+        append!(bytes, read_data_block_part(img, frag_blk, inode))
     end
     @assert length(bytes) == inode.file_size  (length(bytes), inode, inode.block_sizes)
     return bytes

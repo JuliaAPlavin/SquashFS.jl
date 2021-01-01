@@ -111,7 +111,6 @@ size(bs::BlockSize) = bs.value & 0xFFFFFF
     block_sizes          ::Vector{BlockSize} = [] # A list of block sizes. If this file ends in a fragment, the size of this list is the number of full data blocks needed to store file_size bytes. If this file does not have a fragment, the size of the list is the number of blocks needed to store file_size bytes, rounded up. Each item in the list describes the (possibly compressed) size of a block. See datablocks & fragments for information about how to interpret this size.
 end
 block_count(i::InodeFile, sb::Superblock) = !is_valid(i.fragment_block_index) ? cld(i.file_size, sb.block_size) : fld(i.file_size, sb.block_size)
-tail_end_size(i::InodeFile, sb::Superblock) = i.file_size % sb.block_size
 
 function Base.read(io::IO, ::Type{InodeFile}, superblock::Superblock)
     res = read_bittypes(io, InodeFile)
