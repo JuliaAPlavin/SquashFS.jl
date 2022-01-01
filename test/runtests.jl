@@ -174,7 +174,9 @@ end
 end
 
 @testset "multithreading" begin
-    @test Threads.nthreads() > 1
+    if Threads.nthreads() <= 1
+        @error "Only a single thread is available"
+    end
 
     cd(mktempdir())
     mkdir("./xdir")
