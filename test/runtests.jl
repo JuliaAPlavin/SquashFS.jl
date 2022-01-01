@@ -29,8 +29,8 @@ end
     write("./xdir/fsdsfаоывладылfkdsf", "привет! abc def\n\n\r")
     run(pipeline(`$mksquashfs xdir xdir.sqsh`, stdout=devnull))
     img = SquashFS.open("xdir.sqsh")
-    @test Set(SquashFS.readdir(img, "/")) == Set(["emptyfile", "tmpfile", "fsdsfаоывладылfkdsf"])
-    @test Set(SquashFS.files_recursive(img, "/")) == Set(["emptyfile", "tmpfile", "fsdsfаоывладылfkdsf"])
+    @test sort(SquashFS.readdir(img, "/")) == sort(["emptyfile", "tmpfile", "fsdsfаоывладылfkdsf"])
+    @test sort(SquashFS.files_recursive(img, "/")) == sort(["emptyfile", "tmpfile", "fsdsfаоывладылfkdsf"])
     @test_throws KeyError SquashFS.readdir(img, "/abc")
     @test_throws KeyError SquashFS.readfile(img, "/abc")
     @test SquashFS.readfile(img, "/emptyfile", String) == ""
@@ -52,8 +52,8 @@ end
     run(pipeline(`$mksquashfs xdir xdir.sqsh`, stdout=devnull))
     @test stat("xdir.sqsh").size < 50_000  # confirm compression
     img = SquashFS.open("xdir.sqsh")
-    @test Set(SquashFS.readdir(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
-    @test Set(SquashFS.files_recursive(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
+    @test sort(SquashFS.readdir(img, "/")) == sort(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
+    @test sort(SquashFS.files_recursive(img, "/")) == sort(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
     @test SquashFS.readfile(img, "/longfile1", String) == content1
     @test SquashFS.readfile(img, "/longfile2", String) == content2
     @test SquashFS.readfile(img, "/longfile3", String) == content3
@@ -71,8 +71,8 @@ end
     write("./xdir/longfile3", content3)
     run(pipeline(`$mksquashfs xdir xdir.sqsh $args`, stdout=devnull))
     img = SquashFS.open("xdir.sqsh")
-    @test Set(SquashFS.readdir(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"])
-    @test Set(SquashFS.files_recursive(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"])
+    @test sort(SquashFS.readdir(img, "/")) == sort(["longfile1"; "longfile2"; "longfile3"])
+    @test sort(SquashFS.files_recursive(img, "/")) == sort(["longfile1"; "longfile2"; "longfile3"])
     @test SquashFS.readfile(img, "/longfile1", String) == content1
     @test SquashFS.readfile(img, "/longfile2", String) == content2
     @test SquashFS.readfile(img, "/longfile3", String) == content3
@@ -92,8 +92,8 @@ end
     run(pipeline(`$mksquashfs xdir xdir.sqsh -comp $comp`, stdout=devnull))
     @test stat("xdir.sqsh").size < 200_000  # confirm compression
     img = SquashFS.open("xdir.sqsh")
-    @test Set(SquashFS.readdir(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
-    @test Set(SquashFS.files_recursive(img, "/")) == Set(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
+    @test sort(SquashFS.readdir(img, "/")) == sort(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
+    @test sort(SquashFS.files_recursive(img, "/")) == sort(["longfile1"; "longfile2"; "longfile3"; "longfile4"])
     @test SquashFS.readfile(img, "/longfile1", String) == content1
     @test SquashFS.readfile(img, "/longfile2", String) == content2
     @test SquashFS.readfile(img, "/longfile3", String) == content3
@@ -119,21 +119,24 @@ end
     write("./xdir/abc/def/првиет/file.txt", "\nabc\n")
     run(pipeline(`$mksquashfs xdir xdir.sqsh`, stdout=devnull))
 
-    img = SquashFS.open("xdir.sqsh")
-    @test Set(SquashFS.readdir(img, "/")) == Set(["emptyfile"; "tmpfile"; "longfile1"; "longfile2"; "longfile3"; "fsdsfаоывладылfkdsf"; "abc"; ["smallfile$i" for i in 1:1000]])
-    @test Set(SquashFS.files_recursive(img, "/")) == Set(["emptyfile"; "tmpfile"; "longfile1"; "longfile2"; "longfile3"; "fsdsfаоывладылfkdsf"; "abc/def/првиет/file.txt"; ["smallfile$i" for i in 1:1000]])
-    @test Set(SquashFS.rglob(img, ".txt", "/")) == Set(["abc/def/првиет/file.txt"])
-    @test SquashFS.readfile(img, "/emptyfile", String) == ""
-    @test SquashFS.readfile(img, "/tmpfile", String) == "abc def\n\n\r"
-    @test SquashFS.readfile(img, "/fsdsfаоывладылfkdsf", String) == "привет! abc def\n\n\r"
-    @test SquashFS.readfile(img, "/longfile1", String) == content1
-    @test SquashFS.readfile(img, "/longfile2", String) == content2
-    @test SquashFS.readfile(img, "/longfile3", String) == content3
-    for i in [1, 2, 3, 4, 5, 123, 500, 999, 1000]  # test several files among those 1000
-        @test SquashFS.readfile(img, "/smallfile$i", String) == join([string(j) for j in 1:i], "\n")
+    @testset begin
+        img = SquashFS.open("xdir.sqsh")
+        @test sort(SquashFS.readdir(img, "/")) == sort(["emptyfile"; "tmpfile"; "longfile1"; "longfile2"; "longfile3"; "fsdsfаоывладылfkdsf"; "abc"; ["smallfile$i" for i in 1:1000]])
+        @test sort(SquashFS.files_recursive(img, "/")) == sort(["emptyfile"; "tmpfile"; "longfile1"; "longfile2"; "longfile3"; "fsdsfаоывладылfkdsf"; "abc/def/првиет/file.txt"; ["smallfile$i" for i in 1:1000]])
+        @test sort(SquashFS.rglob(img, ".txt", "/")) == sort(["abc/def/првиет/file.txt"])
+        @test SquashFS.readfile(img, "/emptyfile", String) == ""
+        @test SquashFS.readfile(img, "/tmpfile", String) == "abc def\n\n\r"
+        @test SquashFS.readfile(img, "/fsdsfаоывладылfkdsf", String) == "привет! abc def\n\n\r"
+        @test SquashFS.readfile(img, "/longfile1", String) == content1
+        @test SquashFS.readfile(img, "/longfile2", String) == content2
+        @test SquashFS.readfile(img, "/longfile3", String) == content3
+        for i in [1, 2, 3, 4, 5, 123, 500, 999, 1000]  # test several files among those 1000
+            @test SquashFS.readfile(img, "/smallfile$i", String) == join([string(j) for j in 1:i], "\n")
+        end
+        @test SquashFS.readdir(img, "/abc") == ["def"]
+        @test SquashFS.readfile(img, "/abc/def/првиет/file.txt", String) == "\nabc\n"
     end
-    @test SquashFS.readdir(img, "/abc") == ["def"]
-    @test SquashFS.readfile(img, "/abc/def/првиет/file.txt", String) == "\nabc\n"
+
 end
 
 @testset "multithreading" begin
