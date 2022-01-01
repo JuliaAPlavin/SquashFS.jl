@@ -11,7 +11,9 @@ Generate files that go into a SquashFS image, and create the sample image:
 ```jldoctest label
 julia> orig_dir = pwd();
 
-julia> cd(mktempdir());
+julia> tmp = mktempdir();
+
+julia> cd(tmp);
 
 julia> mkpath("./dir/subdir");
 
@@ -19,38 +21,54 @@ julia> write("./dir/filea.txt", "aaa");
 
 julia> write("./dir/subdir/fileb.dat", "abc");
 
-julia> import squashfs_tools_jll.mksquashfs_path as mksquashfs
+julia> write("./dir/subdir/filec.dat", "def");
+
+julia> import squashfs_tools_jll: mksquashfs
 
 julia> run(pipeline(`$mksquashfs dir image.sqsh`, stdout=devnull));
+
+julia> cd(orig_dir);
 ```
 
-Access the generated image with functions from this package: open, list files, read textual content:
+Open the SquashFS image and access it with common `Base` filesystem functions:
 
 ```jldoctest label
 julia> import SquashFS
 
-julia> img = SquashFS.open("image.sqsh");
+julia> img = SquashFS.open(joinpath(tmp, "image.sqsh"));
 
-julia> SquashFS.readdir(img, "/")
+julia> root = SquashFS.rootdir(img);
+
+julia> readdir(root)
 2-element Vector{String}:
+ "filea.txt"
  "subdir"
- "filea.txt"
 
-julia> SquashFS.files_recursive(img, "/")
-2-element Vector{String}:
- "filea.txt"
- "subdir/fileb.dat"
+julia> isdir(root)
+true
 
-julia> SquashFS.rglob(img, r"....b")
+julia> isdir(joinpath(root, "subdir"))
+true
+
+julia> [basename(f) for f in readdir(root; join=true) if isfile(f)]
 1-element Vector{String}:
- "subdir/fileb.dat"
+ "filea.txt"
 
-julia> SquashFS.readfile(img, "/filea.txt", String)
+julia> read(joinpath(root, "filea.txt"), String)
 "aaa"
 
-julia> cd(orig_dir)
+julia> readdir(joinpath(root, "subdir"))
+2-element Vector{String}:
+ "fileb.dat"
+ "filec.dat"
 
+julia> read.(readdir(joinpath(root, "subdir"); join=true), String)
+2-element Vector{String}:
+ "abc"
+ "def"
 ```
+
+Several specialized functions are provided as well, see reference docs below.
 
 # Reference
 
