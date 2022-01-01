@@ -1,6 +1,7 @@
 name: CI
 
-on: push
+on: [push, workflow_dispatch]
+  
 
 env:
   JULIA_NUM_THREADS: 4
@@ -11,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.5', '~1.6.0-0', 'nightly']
+        julia-version: ['1.6', 'nightly']
         julia-arch: [x64]
         os: [ubuntu-latest]
 
