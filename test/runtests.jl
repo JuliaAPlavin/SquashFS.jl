@@ -2,9 +2,6 @@ using Test
 import SquashFS
 import squashfs_tools_jll: mksquashfs_path; const mksquashfs = mksquashfs_path
 
-import CompatHelperLocal
-CompatHelperLocal.@check()
-
 # withenv("JULIA_LOAD_PATH" => nothing) do
 #     run(`$(Base.julia_cmd()) ../docs/make.jl`)
 # end
@@ -220,3 +217,7 @@ end
 # @show SquashFS.readfile(img, 1)
 # @show SquashFS.readfile(img, "/" * files[1])
 # @btime SquashFS.readfile($img, 1)
+
+
+import CompatHelperLocal
+CompatHelperLocal.@check()
